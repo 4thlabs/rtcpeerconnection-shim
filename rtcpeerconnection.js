@@ -757,8 +757,9 @@ module.exports = function(window, edgeVersion) {
     }
 
     var streams = {};
+    var originalStreams = {};
     this.remoteStreams.forEach(function(stream) {
-      streams[stream.id] = stream;
+      originalStreams[stream.id] = stream;
     });
     var receiverList = [];
     var sections = SDPUtils.splitSections(description.sdp);
@@ -890,38 +891,34 @@ module.exports = function(window, edgeVersion) {
         }];
 
         if (direction === 'sendrecv' || direction === 'sendonly') {
-          var isNewTrack = !transceiver.rtpReceiver;
-          rtpReceiver = transceiver.rtpReceiver ||
-              new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
+          rtpReceiver = transceiver.rtpReceiver || new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
 
-          if (isNewTrack) {
-            var stream;
-            track = rtpReceiver.track;
-            // FIXME: does not work with Plan B.
-            if (remoteMsid) {
-              if (!streams[remoteMsid.stream]) {
-                streams[remoteMsid.stream] = new window.MediaStream();
-                Object.defineProperty(streams[remoteMsid.stream], 'id', {
-                  get: function() {
-                    return remoteMsid.stream;
-                  }
-                });
-              }
-              Object.defineProperty(track, 'id', {
+          var stream;
+          track = rtpReceiver.track;
+          // FIXME: does not work with Plan B.
+          if (remoteMsid) {
+            if (!streams[remoteMsid.stream]) {
+              streams[remoteMsid.stream] = new window.MediaStream();
+              Object.defineProperty(streams[remoteMsid.stream], 'id', {
                 get: function() {
-                  return remoteMsid.track;
+                  return remoteMsid.stream;
                 }
               });
-              stream = streams[remoteMsid.stream];
-            } else {
-              if (!streams.default) {
-                streams.default = new window.MediaStream();
-              }
-              stream = streams.default;
             }
-            stream.addTrack(track);
-            receiverList.push([track, rtpReceiver, stream]);
+            Object.defineProperty(track, 'id', {
+              get: function() {
+                return remoteMsid.track;
+              }
+            });
+            stream = streams[remoteMsid.stream];
+          } else {
+            if (!streams.default) {
+              streams.default = new window.MediaStream();
+            }
+            stream = streams.default;
           }
+          stream.addTrack(track);
+          receiverList.push([track, rtpReceiver, stream]);
         }
 
         transceiver.localCapabilities = localCapabilities;
@@ -1046,8 +1043,30 @@ module.exports = function(window, edgeVersion) {
             if (typeof self.ontrack === 'function') {
               self.ontrack(trackEvent);
             }
-          });
+          }, 0);
         });
+      }
+    });
+
+    Object.keys(originalStreams).forEach(function(sid) {
+      var stream = originalStreams[sid];
+      if (streams[sid] !== stream) {
+        var event = new Event('removestream');
+        event.stream = stream;
+        window.setTimeout(function() {
+          var index = -1;
+          self.remoteStreams.forEach(function(s, i) {
+              if (s === stream) {index = i;}
+          });
+          if (index !== -1) {
+              self.remoteStreams.splice(index, 1);
+          }
+
+          self.dispatchEvent(event);
+          if (typeof self.onremovestream === 'function') {
+            self.onremovestream(event);
+          }
+        }, 1);
       }
     });
 
