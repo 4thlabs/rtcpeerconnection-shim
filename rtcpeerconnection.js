@@ -891,7 +891,8 @@ module.exports = function(window, edgeVersion) {
         }];
 
         if (direction === 'sendrecv' || direction === 'sendonly') {
-          rtpReceiver = transceiver.rtpReceiver || new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
+          var oldReceiver = transceiver.rtpReceiver;
+          rtpReceiver = new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
 
           var stream;
           track = rtpReceiver.track;
@@ -919,6 +920,11 @@ module.exports = function(window, edgeVersion) {
           }
           stream.addTrack(track);
           receiverList.push([track, rtpReceiver, stream]);
+        }
+
+        if (oldReceiver) {
+            transceiver.rtpReceiver.stop();
+            delete transceiver.rtpReceiver;
         }
 
         transceiver.localCapabilities = localCapabilities;
