@@ -882,8 +882,10 @@ module.exports = function(window, edgeVersion) {
     }
 
     var streams = {};
+    var originalStreams = {};
+
     pc.remoteStreams.forEach(function(stream) {
-      streams[stream.id] = stream;
+      originalStreams[stream.id] = stream;
     });
     var receiverList = [];
     var sections = SDPUtils.splitSections(description.sdp);
@@ -1030,40 +1032,40 @@ module.exports = function(window, edgeVersion) {
           isNewTrack = !transceiver.rtpReceiver;
           rtpReceiver = transceiver.rtpReceiver ||
               new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
-
-          if (isNewTrack) {
-            var stream;
-            track = rtpReceiver.track;
-            // FIXME: does not work with Plan B.
-            if (remoteMsid && remoteMsid.stream === '-') {
-              // no-op. a stream id of '-' means: no associated stream.
-            } else if (remoteMsid) {
-              if (!streams[remoteMsid.stream]) {
-                streams[remoteMsid.stream] = new window.MediaStream();
-                Object.defineProperty(streams[remoteMsid.stream], 'id', {
-                  get: function() {
-                    return remoteMsid.stream;
-                  }
-                });
-              }
+          
+          var stream;
+          track = rtpReceiver.track;
+          // FIXME: does not work with Plan B.
+          if (remoteMsid && remoteMsid.stream === '-') {
+            // no-op. a stream id of '-' means: no associated stream.
+          } else if (remoteMsid) {
+            if (!streams[remoteMsid.stream]) {
+              streams[remoteMsid.stream] = new window.MediaStream();
+              Object.defineProperty(streams[remoteMsid.stream], 'id', {
+                get: function() {
+                  return remoteMsid.stream;
+                }
+              });
+            }
+            if (track && !track.id) {
               Object.defineProperty(track, 'id', {
                 get: function() {
                   return remoteMsid.track;
                 }
               });
-              stream = streams[remoteMsid.stream];
-            } else {
-              if (!streams.default) {
-                streams.default = new window.MediaStream();
-              }
-              stream = streams.default;
             }
-            if (stream) {
-              addTrackToStreamAndFireEvent(track, stream);
-              transceiver.associatedRemoteMediaStreams.push(stream);
+            stream = streams[remoteMsid.stream];
+          } else {
+            if (!streams.default) {
+              streams.default = new window.MediaStream();
             }
-            receiverList.push([track, rtpReceiver, stream]);
+            stream = streams.default;
           }
+          if (stream) {
+            addTrackToStreamAndFireEvent(track, stream);
+            transceiver.associatedRemoteMediaStreams.push(stream);
+          }
+          receiverList.push([track, rtpReceiver, stream]);
         } else if (transceiver.rtpReceiver && transceiver.rtpReceiver.track) {
           transceiver.associatedRemoteMediaStreams.forEach(function(s) {
             var nativeTrack = s.getTracks().find(function(t) {
@@ -1192,6 +1194,28 @@ module.exports = function(window, edgeVersion) {
         return;
       }
       fireAddTrack(pc, item[0], item[1], []);
+    });
+
+    Object.keys(originalStreams).forEach(function(sid) {
+      var stream = originalStreams[sid];
+      if (streams[sid] !== stream) {
+        var event = new Event('removestream');
+        event.stream = stream;
+        window.setTimeout(function() {
+          var index = -1;
+          pc.remoteStreams.forEach(function(s, i) {
+              if (s === stream) {index = i;}
+          });
+          if (index !== -1) {
+              pc.remoteStreams.splice(index, 1);
+          }
+
+          pc._dispatchEvent('removestream', event);
+          if (typeof self.onremovestream === 'function') {
+            self.onremovestream(event);
+          }
+        }, 1);
+      }
     });
 
     // check whether addIceCandidate({}) was called within four seconds after
