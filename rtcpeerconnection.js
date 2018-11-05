@@ -1029,11 +1029,8 @@ module.exports = function(window, edgeVersion) {
                 }];
 
                 // TODO: rewrite to use http://w3c.github.io/webrtc-pc/#set-associated-remote-streams
-                var isNewTrack = false;
                 if (direction === 'sendrecv' || direction === 'sendonly') {
-                    isNewTrack = !transceiver.rtpReceiver;
-                    rtpReceiver = transceiver.rtpReceiver ||
-                        new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
+                    rtpReceiver = new window.RTCRtpReceiver(transceiver.dtlsTransport, kind);
 
                     var stream;
                     track = rtpReceiver.track;
@@ -1068,16 +1065,23 @@ module.exports = function(window, edgeVersion) {
                         transceiver.associatedRemoteMediaStreams.push(stream);
                     }
                     receiverList.push([track, rtpReceiver, stream]);
-                } else if (transceiver.rtpReceiver && transceiver.rtpReceiver.track) {
-                    transceiver.associatedRemoteMediaStreams.forEach(function(s) {
-                        var nativeTrack = s.getTracks().find(function(t) {
-                            return t.id === transceiver.rtpReceiver.track.id;
-                        });
-                        if (nativeTrack) {
-                            removeTrackFromStreamAndFireEvent(nativeTrack, s);
-                        }
-                    });
-                    transceiver.associatedRemoteMediaStreams = [];
+                }
+                // else if (transceiver.rtpReceiver && transceiver.rtpReceiver.track) {
+                //     transceiver.associatedRemoteMediaStreams.forEach(function(s) {
+                //         var nativeTrack = s.getTracks().find(function(t) {
+                //             return t.id === transceiver.rtpReceiver.track.id;
+                //         });
+                //         if (nativeTrack) {
+                //             removeTrackFromStreamAndFireEvent(nativeTrack, s);
+                //         }
+                //     });
+                //     transceiver.associatedRemoteMediaStreams = [];
+                // }
+
+                if (transceiver.rtpReceiver) {
+                    transceiver.rtpReceiver.stop();
+                    transceiver.rtpReceiver = null;
+                    transceiver.recvEncodingParameters = null;
                 }
 
                 transceiver.localCapabilities = localCapabilities;
@@ -1091,7 +1095,7 @@ module.exports = function(window, edgeVersion) {
                 // setLocalDescription.
                 pc._transceive(pc.transceivers[sdpMLineIndex],
                     false,
-                    isNewTrack);
+                    direction === 'sendrecv' || direction === 'sendonly');
             } else if (description.type === 'answer' && !rejected) {
                 transceiver = pc.transceivers[sdpMLineIndex];
                 iceGatherer = transceiver.iceGatherer;
