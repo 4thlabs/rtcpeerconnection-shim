@@ -534,6 +534,10 @@ module.exports = function(window, edgeVersion) {
         });
     };
 
+    RTCPeerConnection.prototype.getTransceivers = function() {
+        return this.transceivers;
+    };
+
     RTCPeerConnection.prototype.getSenders = function() {
         return this.transceivers.filter(function(transceiver) {
             return !!transceiver.rtpSender;
