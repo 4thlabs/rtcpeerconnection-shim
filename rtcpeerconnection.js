@@ -510,6 +510,8 @@ module.exports = function(window, edgeVersion) {
         transceiver.stream = null;
         transceiver.sendEncodingParameters = null;
 
+
+
         // remove the stream from the set of local streams
         var localStreams = this.transceivers.map(function(t) {
             return t.stream;
@@ -1029,7 +1031,7 @@ module.exports = function(window, edgeVersion) {
 
                 ssrcId = ssrcId + 1;
                 sendEncodingParameters = transceiver.sendEncodingParameters || [{
-                    ssrc: (ssrcId * sdpMLineIndex + 2) * 1001
+                    ssrc: (ssrcId * (sdpMLineIndex + 1) + 2) * 1001
                 }];
 
                 // TODO: rewrite to use http://w3c.github.io/webrtc-pc/#set-associated-remote-streams
@@ -1499,7 +1501,7 @@ module.exports = function(window, edgeVersion) {
             // generate an ssrc now, to be used later in rtpSender.send
             ssrcId = ssrcId + 1;
             var sendEncodingParameters = transceiver.sendEncodingParameters || [{
-                ssrc: (ssrcId * sdpMLineIndex + 1) * 1001
+                ssrc: (ssrcId * (sdpMLineIndex + 1) + 1) * 1001
             }];
             if (track) {
                 // add RTX
